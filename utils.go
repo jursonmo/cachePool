@@ -1,4 +1,4 @@
-package main
+package cachePool
 
 type CachePad struct {
 	padding [8]int64 //for avoid false share

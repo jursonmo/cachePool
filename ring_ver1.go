@@ -1,6 +1,6 @@
 // +build !ver2
 
-package main
+package cachePool
 
 import (
 	"fmt"

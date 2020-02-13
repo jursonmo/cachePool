@@ -1,17 +1,20 @@
-package main
+package cachePool
 
 /*
-工作中经常需要一个 key value 的 缓存，并且需要经常修改value的值，所以value必须是一个指针，如果按正常的做法
-就是map[key]*struct{xxx},每次make一个value对象，如果这个map比较大，就比较造成gc扫描的时间过长，map锁竞争过大，且造成内存
-碎片化。为了避免这几个问题，要做到以下
+#### 工作中经常需要一个 key value 的 缓存，并且需要经常修改value的值，所以value必须是一个指针，如果按正常的做法
+就是map[key]*struct{xxx},每次make一个value对象，如果这个map比较大，
+1. 造成内存碎片化
+2. 造成gc扫描的时间过长，
+3. map 读写过多，锁竞争过大，效率低。
+####为了避免以上这几个问题，要做到以下:
 1. map 的key 和 value都不包含指针，避免gc 扫描， bigcache 就是map[int]int方式避免gc扫描。
 	验证[slice 和 map 数据类型不同，gc 扫描时间也不同](https://github.com/jursonmo/articles/blob/master/record/go/performent/slice_map_gc.md)
 2. map的操作需要读写锁的保护，但是频繁读写map，竞争过大，效率过低，可以使用shardMap 方式减小锁的竞争
 3. 预先分配一个大的对象池，每次分配对象时，不用make，直接从对象池里去，用完再放回去。
    关键是要实现一个效率高的、可伸缩的对象池；
-    a. slots 快速找到一个可用的对象
-	b. spinLock 自旋锁(需要时间的验证和考验,并且小心使用)
-	c. ring
+    3.1 slots 快速找到一个可用的对象
+	3.2 spinLock 自旋锁(需要时间的验证和考验,并且小心使用)
+	3.3 或者用 环形缓存区ring 来记录对象位置。
 
 all: no pointer in key or value, or value's pointer will not be gc when cachePool is working
      1. slots or ringslots record the free buffer position
@@ -66,16 +69,16 @@ type Entry struct {
 }
 
 type Value struct {
-	a, b, c int //如果包含指针，保证指针指向的对象不会被gc 回收
+	A, B, C int //如果包含指针，保证指针指向的对象不会被gc 回收
 }
 
 //Key must implement Hash() for shardMap
 type Key struct {
-	a, b, c int //尽量不要有指针，避免扫描
+	A, B, C int //尽量不要有指针，避免扫描
 }
 
 func (k *Key) Hash() int {
-	return k.a
+	return k.A
 }
 
 type cachePool struct {
@@ -159,6 +162,10 @@ func (cp *cachePool) String() string {
 
 func (cp *cachePool) GetPoolNum() int {
 	return len(cp.pools)
+}
+
+func (cp *cachePool) GetPoolPositioner(i int) EntryPositioner {
+	return cp.pools[i].positioner
 }
 
 func NewPool(index, cap int) (*Pool, error) {
@@ -269,7 +276,7 @@ func (cp *cachePool) GetValue() *Value {
 		cp.pools = append(cp.pools, p)
 		cp.Unlock()
 		//log
-		fmt.Printf("add new pool")
+		fmt.Printf("add new pool,now cp:%s\n", cp)
 	}
 	return nil
 }
@@ -373,6 +380,7 @@ func (cp *cachePool) getEntryFromElemID(elemID uint64) *Entry {
 	return (*Entry)(unsafe.Pointer(&pbuf[entryh.entryId]))
 }
 
+/*
 func main() {
 	flag.Parse()
 	cp, err := NewCachePool(2, 4)
@@ -387,9 +395,9 @@ func main() {
 	e := GetEntryFromElem(v)
 	fmt.Println(e)
 	//dosomthing with v
-	v.a = 3
-	v.b = 2
-	v.c = 1
+	v.A = 3
+	v.B = 2
+	v.C = 1
 
 	cp.Store(key, v)
 	newv := cp.Load(key)
@@ -440,3 +448,4 @@ func testExtend() {
 	}
 	fmt.Println(cp)
 }
+*/
