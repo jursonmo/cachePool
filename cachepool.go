@@ -82,13 +82,19 @@ func (k *Key) Hash() int {
 	return k.A
 }
 
+type CachePoolConf struct {
+	poolNum    int
+	poolCap    int
+	autoExtend bool
+	maxPool    int
+	shardSize  int
+}
+
 type cachePool struct {
 	pools []*Pool
 	sm    *poolShardMap
 	sync.Mutex
-	autoExtend bool
-	poolCap    int
-	maxPool    int
+	CachePoolConf
 }
 
 type EntryPositioner interface {
@@ -144,19 +150,60 @@ func (e *EntryHeader) invalid() bool {
 	return e.nextFree&Invalid != 0
 }
 
-func NewCachePool(poolNum, poolCap int) (cp *cachePool, err error) {
+type Option func(*CachePoolConf)
+
+func OptionWithAutoExtend(b bool) Option {
+	return func(c *CachePoolConf) {
+		c.autoExtend = b
+	}
+}
+
+func OptionWithMaxPool(n int) Option {
+	return func(c *CachePoolConf) {
+		c.maxPool = n
+	}
+}
+
+func OptionWithShardSize(n int) Option {
+	return func(c *CachePoolConf) {
+		c.shardSize = n
+	}
+}
+
+func (c *CachePoolConf) Check() error {
+	if c.poolNum == 0 || c.poolCap == 0 || c.shardSize == 0 {
+		return fmt.Errorf("poolNum or poolCap or shardSize eq 0")
+	}
+	return nil
+}
+
+func NewCachePool(poolNum, poolCap int, opts ...Option) (cp *cachePool, err error) {
 	cp = new(cachePool)
-	cp.pools = make([]*Pool, poolNum)
+	cp.poolCap = poolCap
+	cp.poolNum = poolNum
+
+	cp.autoExtend = true //default
+	if cp.shardSize == 0 {
+		cp.shardSize = cp.poolNum //default shardSize is eq poolNum
+	}
+
+	for _, opt := range opts {
+		opt(&cp.CachePoolConf)
+	}
+	err = cp.Check()
+	if err != nil {
+		return
+	}
+
+	cp.pools = make([]*Pool, cp.poolNum)
 	for i := 0; i < len(cp.pools); i++ {
-		cp.pools[i], err = NewPool(i, poolCap)
+		cp.pools[i], err = NewPool(i, cp.poolCap)
 		if err != nil {
 			return
 		}
 	}
-	cp.autoExtend = true
-	cp.poolCap = poolCap
-	shardSize := poolNum //default shardSize is eq poolNum
-	cp.sm, err = NewShardMap(shardSize)
+
+	cp.sm, err = NewShardMap(cp.shardSize)
 	return
 }
 
