@@ -110,7 +110,7 @@ func (s *slotsPosition) GetEntryHeader() EntryHeader {
 	id := s.Get()
 	//fmt.Println("id===========", id)
 	if s.invalid(id) {
-		fmt.Printf("slot index=%d invalid", id)
+		fmt.Printf("slot index=%d invalid\n", id)
 		return InvalidEntryHeader
 	}
 	return s.slots[int(id)]

@@ -6,7 +6,7 @@ package cachePool
 1. 造成内存碎片化
 2. 造成gc扫描的时间过长，
 3. map 读写过多，锁竞争过大，效率低。
-####为了避免以上这几个问题，要做到以下:
+#### 为了避免以上这几个问题，要做到以下:
 1. map 的key 和 value都不包含指针，避免gc 扫描， bigcache 就是map[int]int方式避免gc扫描。
 	验证[slice 和 map 数据类型不同，gc 扫描时间也不同](https://github.com/jursonmo/articles/blob/master/record/go/performent/slice_map_gc.md)
 2. map的操作需要读写锁的保护，但是频繁读写map，竞争过大，效率过低，可以使用shardMap 方式减小锁的竞争
@@ -56,7 +56,8 @@ type EntryHeader struct {
 		1. nextFree's hihgest bit means using flag
 		2. slotsPosition: buffer's EntryHeader's nextFree correspond slot index,
 			but in slots[]EntryHeader,EntryHeader's nextFree means next free slot'index
-		3. ringPosition: buffer's EntryHeader's nextFree unused, ring EntryHeader's nextFree is for checking if available
+		3. ringPosition: buffer's EntryHeader's nextFree only use hihgest bit ( means entry is used)
+		   , ring EntryHeader's nextFree is for checking if available
 	*/
 	nextFree uint32 //golang have no union feature
 }
@@ -85,7 +86,9 @@ type cachePool struct {
 	pools []*Pool
 	sm    *poolShardMap
 	sync.Mutex
-	poolCap int
+	autoExtend bool
+	poolCap    int
+	maxPool    int
 }
 
 type EntryPositioner interface {
@@ -141,16 +144,17 @@ func (e *EntryHeader) invalid() bool {
 	return e.nextFree&Invalid != 0
 }
 
-func NewCachePool(poolNum, slotsNum int) (cp *cachePool, err error) {
+func NewCachePool(poolNum, poolCap int) (cp *cachePool, err error) {
 	cp = new(cachePool)
 	cp.pools = make([]*Pool, poolNum)
 	for i := 0; i < len(cp.pools); i++ {
-		cp.pools[i], err = NewPool(i, slotsNum)
+		cp.pools[i], err = NewPool(i, poolCap)
 		if err != nil {
 			return
 		}
 	}
-	cp.poolCap = slotsNum
+	cp.autoExtend = true
+	cp.poolCap = poolCap
 	shardSize := poolNum //default shardSize is eq poolNum
 	cp.sm, err = NewShardMap(shardSize)
 	return
@@ -237,6 +241,7 @@ func (cp *cachePool) PutEntry(e *Entry) bool {
 		return false
 	}
 	//todo: 如果使用率过少，可以不用put 回去，当这个pool 使用率为0时，可以清除pool，让gc 回收
+
 	//clean UsedFlag even if put fail
 	e.nextFree &= (UsedFlag - 1)
 	return cp.pools[index].PutEntry(e)
@@ -249,34 +254,53 @@ func (p *Pool) PutEntry(e *Entry) bool {
 
 func (cp *cachePool) GetValue() *Value {
 	var p *Pool
-	var poolNum int
+	poolNum := 0
+	start := getPid()
 	for {
 		poolNum = len(cp.pools)
-		for i := 0; i < poolNum; i++ {
-			p = cp.pools[i]
+		for n := 0; n < poolNum; start++ {
+			n++
+			p = cp.pools[start%poolNum]
+			if p == nil {
+				continue
+			}
 			entry := p.GetEntry()
+			fmt.Printf("process id:%d\n", start)
 			if entry != nil {
-				fmt.Println("GetValue:", entry)
-				entry.nextFree |= UsedFlag //means this entry of buffer has been used
 				//return entry
 				return &entry.Value
 			}
 		}
+		if !cp.autoExtend {
+			return nil
+		}
 		var err error
 		cp.Lock()
 		if poolNum < len(cp.pools) { //have apppend new pool
+			start = len(cp.pools) - 1 //so start from last pool
 			cp.Unlock()
 			continue
+		}
+		if cp.maxPool != 0 && len(cp.pools) >= cp.maxPool {
+			//log
+			fmt.Printf("")
+			cp.Unlock()
+			return nil
 		}
 		p, err = NewPool(len(cp.pools), cp.poolCap)
 		if err != nil {
 			cp.Unlock()
 			return nil
 		}
+		entry := p.GetEntry()
 		cp.pools = append(cp.pools, p)
 		cp.Unlock()
 		//log
 		fmt.Printf("add new pool,now cp:%s\n", cp)
+		if entry == nil {
+			panic("new pool, get entry must be successfull")
+		}
+		return &entry.Value
 	}
 	return nil
 }
@@ -287,7 +311,10 @@ func (p *Pool) GetEntry() *Entry {
 		//log
 		return nil
 	}
-	return (*Entry)(unsafe.Pointer(&p.buffer[int(eh.entryId)]))
+	entry := (*Entry)(unsafe.Pointer(&p.buffer[int(eh.entryId)]))
+	fmt.Println("GetValue:", entry)
+	entry.nextFree |= UsedFlag //means this entry of buffer has been used
+	return entry
 }
 
 func NewShardMap(n int) (*poolShardMap, error) {

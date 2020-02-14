@@ -18,6 +18,12 @@ func (l *SpinLock) Unlock() {
 }
 */
 
+func getPid() int {
+	pid := procPin()
+	procUnpin()
+	return pid
+}
+
 type SpinLock struct {
 	lock uint32
 }
