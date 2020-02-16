@@ -83,11 +83,11 @@ func (k *Key) Hash() int {
 }
 
 type CachePoolConf struct {
-	poolNumInit int //init pool number
-	poolCap     int
-	autoExtend  bool
-	maxPool     int
-	shardSize   int
+	poolNum    int
+	poolCap    int
+	autoExtend bool
+	maxPool    int
+	shardSize  int
 }
 
 type cachePool struct {
@@ -171,8 +171,8 @@ func OptionWithShardSize(n int) Option {
 }
 
 func (c *CachePoolConf) Check() error {
-	if c.poolNumInit == 0 || c.poolCap == 0 || c.shardSize == 0 {
-		return fmt.Errorf("poolNum or poolCap or shardSize eq 0")
+	if c.poolCap == 0 || c.shardSize == 0 {
+		return fmt.Errorf("poolCap or shardSize eq 0")
 	}
 	return nil
 }
@@ -180,11 +180,10 @@ func (c *CachePoolConf) Check() error {
 func NewCachePool(poolNum, poolCap int, opts ...Option) (cp *cachePool, err error) {
 	cp = new(cachePool)
 	cp.poolCap = poolCap
-	cp.poolNumInit = poolNum
 
 	cp.autoExtend = true //default
 	if cp.shardSize == 0 {
-		cp.shardSize = cp.poolNumInit //default shardSize is eq poolNumInit
+		cp.shardSize = poolNum //default shardSize is eq poolNumInit
 	}
 	if cp.shardSize > 16 {
 		cp.shardSize = 16
@@ -198,9 +197,9 @@ func NewCachePool(poolNum, poolCap int, opts ...Option) (cp *cachePool, err erro
 		return
 	}
 
-	cp.pools = make([]*Pool, cp.poolNumInit)
+	cp.pools = make([]*Pool, poolNum)
 	for i := 0; i < len(cp.pools); i++ {
-		cp.pools[i], err = NewPool(i, cp.poolCap)
+		_, err = cp.NewPool()
 		if err != nil {
 			return
 		}
@@ -210,18 +209,33 @@ func NewCachePool(poolNum, poolCap int, opts ...Option) (cp *cachePool, err erro
 	return
 }
 
+func (cp *cachePool) NewPool() (p *Pool, err error) {
+	for i := 0; i < len(cp.pools); i++ {
+		if cp.pools[i] == nil {
+			p, err = NewPool(i, cp.poolCap)
+			if err != nil {
+				return
+			}
+			cp.pools[i] = p
+			cp.poolNum++
+			return
+		}
+	}
+	p, err = NewPool(len(cp.pools), cp.poolCap)
+	if err != nil {
+		return
+	}
+	cp.pools = append(cp.pools, p)
+	cp.poolNum++
+	return
+}
+
 func (cp *cachePool) String() string {
 	return fmt.Sprintf("poolNum:%d, poolcap:%d, shardMap size:%d", cp.GetPoolNum(), cp.poolCap, cp.sm.shardSize)
 }
 
 func (cp *cachePool) GetPoolNum() int {
-	poolSum := 0
-	for _, pool := range cp.pools {
-		if pool != nil {
-			poolSum++
-		}
-	}
-	return poolSum
+	return cp.poolNum
 }
 
 func (cp *cachePool) Capacity() int {
@@ -327,13 +341,16 @@ func (cp *cachePool) GetValue() *Value {
 	poolNum := 0
 	start := getPid()
 	for {
-		poolNum = len(cp.pools)
-		for n := 0; n < poolNum; start++ {
-			n++
-			p = cp.pools[start%poolNum]
+		pools := cp.pools
+		max := len(pools)
+		poolNum = cp.GetPoolNum()
+		for n := 0; n < max; n++ {
+			start++
+			p = pools[start%max]
 			if p == nil {
 				continue
 			}
+
 			entry := p.GetEntry()
 			fmt.Printf("process id:%d\n", start)
 			if entry != nil {
@@ -346,24 +363,23 @@ func (cp *cachePool) GetValue() *Value {
 		}
 		var err error
 		cp.Lock()
-		if poolNum < len(cp.pools) { //have apppend new pool
-			start = len(cp.pools) - 1 //so start from last pool
+		if poolNum < cp.GetPoolNum() { //have apppend new pool
+			//start = len(cp.pools) - 1 //so start from last pool
 			cp.Unlock()
 			continue
 		}
-		if cp.maxPool != 0 && len(cp.pools) >= cp.maxPool {
+		if cp.maxPool != 0 && cp.GetPoolNum() >= cp.maxPool {
 			//log
-			fmt.Printf("")
+			fmt.Printf("have touch top, cp.maxPool:%d", cp.maxPool)
 			cp.Unlock()
 			return nil
 		}
-		p, err = NewPool(len(cp.pools), cp.poolCap)
+		p, err = cp.NewPool()
 		if err != nil {
 			cp.Unlock()
 			return nil
 		}
 		entry := p.GetEntry()
-		cp.pools = append(cp.pools, p)
 		cp.Unlock()
 		//log
 		fmt.Printf("add new pool,now cp:%s\n", cp)
