@@ -360,6 +360,9 @@ func (p *Pool) GetEntry() *Entry {
 	}
 	entry := (*Entry)(unsafe.Pointer(&p.buffer[int(eh.entryId)]))
 	fmt.Println("GetValue:", entry)
+	if entry.isUsed() {
+		panic("GetEntry: entry have been used?")
+	}
 	entry.nextFree |= UsedFlag //means this entry of buffer has been used
 	return entry
 }
