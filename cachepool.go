@@ -83,7 +83,7 @@ func (k *Key) Hash() int {
 }
 
 type CachePoolConf struct {
-	poolNum    int
+	poolNum    int //init pool number
 	poolCap    int
 	autoExtend bool
 	maxPool    int
@@ -184,7 +184,7 @@ func NewCachePool(poolNum, poolCap int, opts ...Option) (cp *cachePool, err erro
 
 	cp.autoExtend = true //default
 	if cp.shardSize == 0 {
-		cp.shardSize = cp.poolNum //default shardSize is eq poolNum
+		cp.shardSize = cp.poolNum //default shardSize is eq init poolNum
 	}
 
 	for _, opt := range opts {
@@ -213,6 +213,16 @@ func (cp *cachePool) String() string {
 
 func (cp *cachePool) GetPoolNum() int {
 	return len(cp.pools)
+}
+
+func (cp *cachePool) Capacity() int {
+	capSum := 0
+	for _, pool := range cp.pools {
+		if pool != nil {
+			capSum += int(pool.Cap())
+		}
+	}
+	return capSum
 }
 
 func (cp *cachePool) GetPoolPositioner(i int) EntryPositioner {
@@ -244,6 +254,10 @@ func NewPool(index, cap int) (*Pool, error) {
 	fmt.Println(p)
 	p.showEntrys()
 	return p, err
+}
+
+func (p *Pool) Cap() uint32 {
+	return p.size
 }
 
 func (p *Pool) invalid(id uint32) bool {
