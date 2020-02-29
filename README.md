@@ -14,8 +14,8 @@
    （类似于syncPool 的功能，但是syncPool 会make多个小对象且会被gc 扫描回收，即syncPool里的对象只能存在于两次gc之间）
    所以关键是要实现一个效率高的、可伸缩的对象池；
     3.1 slots 快速找到一个可用的对象
-	3.2 spinLock 自旋锁(需要时间的验证和考验,并且小心使用)
-	3.3 或者用 环形缓存区ring 来记录对象位置。
+    3.2 spinLock 自旋锁(需要时间的验证和考验,并且小心使用)
+    3.3 或者用 环形缓存区ring 来记录对象位置。
     3.4 如果内存不够，自动新建一个pool
 
 all: no pointer in key or value, or value's pointer will not be gc when cachePool is working
@@ -28,3 +28,6 @@ all: no pointer in key or value, or value's pointer will not be gc when cachePoo
 
 #### TODO：
     1. 自动收缩内存池，即某个pool 使用率不够高，其实是可以在分配内存时不要从这些pool 分配，等待这个pool使用率为0时，可以删除，让gc 回收。
+
+#### 缺点
+    不能作为一个库那样使用， 需要把自己 customKey customValue 分别嵌套在 Key 和 Entry 结构里。
