@@ -4,7 +4,7 @@
 就是map[key]*struct{xxx},每次make一个value对象，如果这个map比较大，
 1. 造成内存碎片化
 2. 造成gc扫描的时间过长，
-3. map 读写过多，锁竞争过大，效率低。
+3. map 读写过多于频繁的话，锁竞争就过大，效率低。
 #### 为了避免以上这几个问题，要做到以下:
 1. map 的key 和 value都不包含指针，避免gc 扫描， bigcache 就是map[int]int方式避免gc扫描。
 	验证[slice 和 map 数据类型不同，gc 扫描时间也不同](https://github.com/jursonmo/articles/blob/master/record/go/performent/slice_map_gc.md)
