@@ -23,7 +23,8 @@ all: no pointer in key or value, or value's pointer will not be gc when cachePoo
      2. map[key]positionID ,positionID indicate the buffer position, so can get the value
 
 #### cachePool 参考 syncPool、bigcache, 但是这两者也有缺点
-    1. syncPool 会make多个小对象(内存碎片化)且会被gc 扫描回收，即syncPool里的对象只能存在于两次gc之间（1.13.x 的syncPool里的对象也就多存在一个GC的间隔）
+    1. syncPool 会make多个小对象(内存碎片化)且会被gc 扫描回收，即syncPool里的对象只能存在于两次gc之间
+    （1.13.x 的syncPool里的对象也就多存在一个GC的间隔）
     2. bigcache: 删除时，底层的ringbuffer 出现“空洞”，即不能保证能充分利用底层内存来存储value
 
 #### TODO：
