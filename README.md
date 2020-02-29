@@ -13,10 +13,10 @@
 3. 预先分配一个大的对象池，每次分配value对象时，不用make，直接从对象池里去，用完再放回去。
    （类似于syncPool 的功能，但是syncPool 会make多个小对象且会被gc 扫描回收，即syncPool里的对象只能存在于两次gc之间）
    所以关键是要实现一个效率高的、可伸缩的对象池；
-    - 3.1 slots 快速找到一个可用的对象
-    - 3.2 spinLock 自旋锁(需要时间的验证和考验,并且小心使用)
-    - 3.3 或者用 环形缓存区ring 来记录对象位置。
-    - 3.4 如果内存不够，自动新建一个pool
+    - 3.1 slots 快速找到一个可用对象在对象池里的位置
+    - 3.2 或者用 环形缓存区ring 来记录对象位置。
+    - 3.3 spinLock 自旋锁来代替sync.Mutex(目前实现的spinLock需要时间的验证和考验,并且小心使用)
+    - 3.4 如果内存不够，自动扩展，新建一个对象池pool
 
 all: no pointer in key or value, or value's pointer will not be gc when cachePool is working
      1. slots or ringslots record the free buffer position
