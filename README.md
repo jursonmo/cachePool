@@ -25,7 +25,8 @@ all: no pointer in key or value, or value's pointer will not be gc when cachePoo
 #### cachePool 参考 syncPool、bigcache, 但是这两者也有缺点
     1. syncPool 会make多个小对象(内存碎片化)且会被gc 扫描回收，即syncPool里的对象只能存在于两次gc之间
     （1.13.x 的syncPool里的对象也就多存在一个GC的间隔）
-    2. bigcache: 删除时，底层的ringbuffer 出现“空洞”，即不能保证能充分利用底层内存来存储value
+    2. bigcache: put 对象时，如果底层内存不够而扩容时，会把原来的池整体拷贝过来；
+                 删除对象时，底层的ringbuffer 出现“空洞”，即不能保证能充分利用底层内存来存储value
 
 #### TODO：
     1. 自动收缩内存池，即某个pool 使用率不够高，其实是可以在分配内存时不要从这些pool 分配，等待这个pool使用率为0时，可以删除，让gc 回收。
