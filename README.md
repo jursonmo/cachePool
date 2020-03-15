@@ -9,7 +9,7 @@
 1. map 的key 和 value都不包含指针，避免gc 扫描， bigcache 就是map[int]int方式避免gc扫描。
 	验证[slice 和 map 数据类型不同，gc 扫描时间也不同](https://github.com/jursonmo/articles/blob/master/record/go/performent/slice_map_gc.md)
     如果value包含了指针, 用 uintptr 类型代替，并且保证指针指向的内存在cachepool运行期间不会被gc 回收
-2. map的操作需要读写锁的保护，但是频繁读写map，竞争过大，效率过低，可以使用shardMap 方式减小锁的竞争
+2. map的操作需要读写锁的保护，但是频繁读写map，竞争过大，效率过低，可以使用shardMap 方式来降低锁的颗粒度从而减小锁的竞争
 3. 预先分配一个大的对象池，每次分配value对象时，不用make，直接从对象池里去，用完再放回去。
    （类似于syncPool 的功能，但是syncPool 会make多个小对象且会被gc 扫描回收，即syncPool里的对象只能存在于两次gc之间）
    所以关键是要实现一个效率高的、可伸缩的对象池；
