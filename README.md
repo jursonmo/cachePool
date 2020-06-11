@@ -1,4 +1,4 @@
-# cachePool 对象池、key value、减轻gc压力
+# cachePool 对象池、key value 缓存、减轻gc压力
 
 #### 工作中经常需要一个 key value 的 缓存，并且需要经常修改value的值，所以value必须是一个指针，如果按正常的做法
 就是map[key]*struct{xxx},每次make一个value对象，如果这个map比较大，
