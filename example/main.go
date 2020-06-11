@@ -11,6 +11,7 @@ func main() {
 	flag.Parse()
 	cp, err := cachePool.NewCachePool(2, 4)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 	key := cachePool.Key{1, 2, 3}
