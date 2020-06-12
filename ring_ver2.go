@@ -37,7 +37,7 @@ func (r *ringEntryPosition2) InitPosition(buffer []byte, poolIndex, cap, entrySi
 	return nil
 }
 
-func (r *ringEntryPosition2) PutEntry(eh *EntryHeader) bool {
+func (r *ringEntryPosition2) PutEntryHeader(eh *EntryHeader) bool {
 	cap := uint32(len(r.ring) - 1)
 	for {
 		tail := atomic.LoadUint32(&r.tail) //maybe something happend between acquire tail and head

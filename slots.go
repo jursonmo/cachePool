@@ -101,7 +101,7 @@ func (s *slotsPosition) Get() uint32 {
 }
 
 //here Entry is pool buffer'Entry
-func (s *slotsPosition) PutEntry(e *EntryHeader) bool {
+func (s *slotsPosition) PutEntryHeader(e *EntryHeader) bool {
 	e.nextFree &= IdMask
 	return s.Put(e.nextFree)
 }

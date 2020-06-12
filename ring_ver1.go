@@ -20,7 +20,7 @@ type ringEntryPosition struct {
 	getRace  uint64
 	_        CachePad
 	headtail uint64
-	ring     []EntryHeader //entryheader have no pointer, no scan
+	ring     []EntryHeader //entryheader have no pointer, GC will not scan the ring slice
 }
 
 func (r *ringEntryPosition) InitPosition(buffer []byte, poolIndex, cap, entrySize int) error {
@@ -33,7 +33,7 @@ func (r *ringEntryPosition) InitPosition(buffer []byte, poolIndex, cap, entrySiz
 		eh.poolId = uint32(poolIndex)
 		eh.entryId = uint32(i * entrySize)
 		// in buffer , eh.nextFree is unused, but in ring entryheader, eh.nextFree is used to available or unavailable
-		r.PutEntry(eh)
+		r.PutEntryHeader(eh)
 	}
 	fmt.Printf("poolId:%d, initRingPosition:%s", poolIndex, r)
 	return nil
@@ -85,7 +85,7 @@ put 线程1：								    put 线程2：
 
 //把head 和 tail 放在一个atomic 操作里，可保证没有问题，但是性能会差些, 因为读写线程都需要操作一个uint64 headtail
 //把head 和 tail 放在一个atomic 操作里，可满足从head pop 即head值减小的情况，比如 1.13 sync.pool getSlow()的实现
-func (r *ringEntryPosition) PutEntry(eh *EntryHeader) bool {
+func (r *ringEntryPosition) PutEntryHeader(eh *EntryHeader) bool {
 	cap := uint32(len(r.ring))
 	n, index := uint32(0), uint32(0)
 	// in for loop, shouldn't be sched
@@ -112,7 +112,7 @@ func (r *ringEntryPosition) PutEntry(eh *EntryHeader) bool {
 		index = head & (cap - 1)
 		for {
 			if atomic.LoadUint32(&r.ring[index].nextFree) == Unavailable {
-				eh.nextFree = Unavailable //set eh to unavailable. 如果没有设置它，可能
+				eh.nextFree = Unavailable //set eh to unavailable.
 				r.ring[index] = *eh       //eh.nextFree == 0（Unavailable）, so get goroutine still can't get it
 				//如果没有设置eh.nextFree = 0 ，可能此时get goroutine 就可以读取到entryHeader，并且设置nextFree=0,
 				//然后继续这里的流程执行atomic.StoreUint32(&p.ring[index].nextFree, head+1)，此slot 将永远不可Put
