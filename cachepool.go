@@ -70,7 +70,7 @@ type Entry struct {
 }
 
 type Value struct {
-	A, B, C int //如果包含指针，保证指针指向的对象不会被gc 回收
+	A, B, C int //如果包含指针，用uintptr 类型替换, 并且保证指针指向的对象不会被gc 回收
 }
 
 //Key must implement Hash() for shardMap
@@ -97,11 +97,12 @@ type cachePool struct {
 	CachePoolConf
 }
 
+//EntryPositioner store the all available entry's position
 type EntryPositioner interface {
 	String() string
 	InitPosition(buffer []byte, poolIndex, cap, entrySize int) error
-	PutEntry(*EntryHeader) bool
-	GetEntryHeader() EntryHeader
+	PutEntryHeader(*EntryHeader) bool //put entry position to ring buffer or slot
+	GetEntryHeader() EntryHeader      //get available entry's position from ring buffer or slot
 }
 
 type Pool struct {
@@ -210,6 +211,7 @@ func NewCachePool(poolNum, poolCap int, opts ...Option) (cp *cachePool, err erro
 }
 
 func (cp *cachePool) NewPool() (p *Pool, err error) {
+	//chose a available slot of cachePool to store the new Pool
 	for i := 0; i < len(cp.pools); i++ {
 		if cp.pools[i] == nil {
 			p, err = NewPool(i, cp.poolCap)
@@ -221,6 +223,7 @@ func (cp *cachePool) NewPool() (p *Pool, err error) {
 			return
 		}
 	}
+	//there is no chose available slot, so newPool and append to cachePool
 	p, err = NewPool(len(cp.pools), cp.poolCap)
 	if err != nil {
 		return
@@ -333,7 +336,7 @@ func (cp *cachePool) PutEntry(e *Entry) bool {
 
 //Delete Value --> buffer entry --> putEntry()
 func (p *Pool) PutEntry(e *Entry) bool {
-	return p.positioner.PutEntry(&e.EntryHeader)
+	return p.positioner.PutEntryHeader(&e.EntryHeader)
 }
 
 func (cp *cachePool) GetValue() *Value {
