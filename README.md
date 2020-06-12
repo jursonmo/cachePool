@@ -37,10 +37,10 @@ all: no pointer in key or value, or value's pointer will not be gc when cachePoo
     3. bigcache: put 对象时，如果底层内存不够而扩容时，会把原来的池整体拷贝过来；
                  删除对象时，底层的ringbuffer 出现“空洞”，即不能保证能充分利用底层内存来存储value
     
-    4. cachePool 获取对象时，借鉴了syncPool，采用Per-P 的方式减少锁的竞争，即优先从当前P对应的Pool里获取对象。
+    4. cachePool 获取对象时，借鉴了syncPool，采用Per-P 的方式减少的竞争，即优先从当前P对应的Pool里获取对象。slot 使用SpinLock、atomic 避免锁使用。
     
 #### TODO：
     1. 自动收缩内存池，即某个pool 使用率不够高，其实是可以在分配内存时不要从这些pool 分配，等待这个pool使用率为0时，可以删除，让gc 回收。
 
 #### 缺点
-    不能作为一个库那样使用， 需要把自己 customKey customValue 分别嵌套在 Key 和 Entry 结构里。
+    不能作为一个库那样使用， 需要把自己 customKey customValue 分别嵌套在 Key 和 Entry 结构里, 且Key Value 是固定的结构, 这导致cachePool不通用，只能作为某种固定对象的缓存、对象池。  
