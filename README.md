@@ -43,13 +43,41 @@ all: no pointer in key or value, or value's pointer will not be gc when cachePoo
     1. 自动收缩内存池，即某个pool 使用率不够高，其实是可以在分配内存时不要从这些pool 分配，等待这个pool使用率为0时，可以删除，让gc 回收。
 
 #### 缺点
-    不能作为一个库那样使用， 需要把自己 customKey customValue 分别嵌套在 Key 和 Entry 结构里, 且Key Value 是固定的结构, 这导致cachePool不通用，只能作为某种固定对象的缓存、对象池。  
+    不能作为一个库那样使用， 需要把自己 customKey customValue 分别嵌套在 Key 和 Entry 结构里, 且Key Value 是固定的结构, 这导致cachePool不通用，只能作为某种固定对象的缓存、对象池。 
+
+#### 大致构图 
 ```
-    cachePool ---> pools
-				+-------+
-                | pool0 |
-                |-------+
-                | pool1 |
-                |-------+
-                | pool2 |
-                |-------+
+cachePool ------> pools            entry0       entry1         entry2
+	|			+-------+      +-------------+-------------+-------------+------+
+    |           | pool0 | ---->|header|value |header|value |header|value |......
+    |           |-------+      +-------------------------------------------------
+    |           | pool1 | ---->|header|value |header|value |header|value |......  
+	|			+-------+      +-------------+-------------+-------------+------+
+    |           | pool2 | ---->|header|value |header|value |header|value |......
+    |           |-------+      +-------------------------------------------------
+    |           每个pool都分配一个大的内存池或者对象池，每个池平均划分大小相同的内存块entry
+    |           每个entry（对象）包含一个header 和value， value是真正使用的内存，而 header 包含entryPosition，用于记录value 的位置信息。
+    |           即可以通过header的entryPosition可以找到value的内存地址
+    |           那怎么知道哪些entry已经被使用了，哪些未被使用呢？通过一个环形缓存区来维护、记录哪些entry可用.
+    |           每个pool都有一个环形缓存区维护、记录其可用entry 信息。
+    |       
+    |----------->shardmap： size is powerOfTwo
+                +------+
+                | map0 | 哈希表0
+                |------+
+                | map1 | 哈希表1
+                |------+
+                | map2 | 哈希表2
+                |------+
+                | map3 | 哈希表3
+                +------+
+                哈希表: 键是代码中使用的Key，值是pool里value的位置信息entryPosition。map[Key]entryPosition,entryPosition不带有指针
+                借鉴bigcache的方式，避免gc扫描。
+```
+过程：
+1. cp.GetValue()：
+    - 1.1 从pool对应的环形区里拿到一个可用节点， 节点保存的是可用的内存块entry的位置信息。
+    - 1.2 根据节点可用找到对应可用的内存块entry，entry.Value 就是代码里可操作的内存。
+2. cp.Store(key, v)：把Key和Value 缓存到 shardmap里，但是shardmap实际保存的值是entryPosition.
+3. cp.Load(key)：通过key 可以找到对象entry的位置信息entryPosition，根据entryPosition便可得到真正对象内存
+4. 删除缓存cp.DeleteAndFreeValue(key)：把key从shardmap缓存中删除，同时把Value对应内存块entry put回到环形区里，这块内存就可复用了。
