@@ -436,11 +436,11 @@ func (cp *cachePool) Store(key Key, v *Value) {
 	cp.sm.Unlock()
 }
 
-func (cp *cachePool) Load(t Key) *Value {
-	hash := t.Hash()
+func (cp *cachePool) Load(key Key) *Value {
+	hash := key.Hash()
 	m := cp.sm.maps[hash&cp.sm.shardMask]
 	cp.sm.RLock()
-	elemID, ok := m[t]
+	elemID, ok := m[key]
 	cp.sm.RUnlock()
 	if !ok {
 		return nil
