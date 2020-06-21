@@ -24,6 +24,7 @@ import (
 	"flag"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -330,7 +331,21 @@ func (cp *cachePool) PutEntry(e *Entry) bool {
 	//todo: 如果使用率过少，可以不用put 回去，当这个pool 使用率为0时，可以清除pool，让gc 回收
 
 	//clean UsedFlag even if put fail
-	e.nextFree &= (UsedFlag - 1)
+	//e.nextFree &= (UsedFlag - 1)
+
+	//check if this entry have been put back, avoid doing PutEntry twice
+	//do it lockless
+	for {
+		flag := atomic.LoadUint32(&e.nextFree)
+		if flag&UsedFlag == 0 { //have clean UsedFlag, means it has been put back to pool
+			break
+		}
+		//clean UsedFlag
+		newflag := flag & (UsedFlag - 1)
+		if atomic.CompareAndSwapUint32(&e.nextFree, flag, newflag) {
+			break
+		}
+	}
 	return cp.pools[index].PutEntry(e)
 }
 
