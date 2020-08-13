@@ -25,9 +25,9 @@
     - 3.3 spinLock 自旋锁来代替sync.Mutex(目前实现的spinLock需要时间的验证和考验,并且小心使用)
     - 3.4 如果内存不够，自动扩展，新建一个对象池pool
 
-all: no pointer in key or value, or value's pointer will not be gc when cachePool is working
-     1. slots or ringslots record the free buffer position
-     2. map[key]positionID ,positionID indicate the buffer position, so can get the value
+#### all: no pointer in key or value, or value's pointer will not be gc when cachePool is working
+    1. slots or ringslots record the free buffer position
+    2. map[key]positionID ,positionID indicate the buffer position, so can get the value
 
 #### cachePool 参考 syncPool、bigcache, 但是这两者也有缺点
     1. syncPool 会make多个小对象(内存碎片化)且会被gc 扫描回收，即syncPool里的对象只能存在于两次gc之间
