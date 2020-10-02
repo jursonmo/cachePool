@@ -21,7 +21,7 @@
    （类似于syncPool 的功能，但是syncPool 会make多个小对象且会被gc 扫描回收，即syncPool里的对象只能存在于两次gc之间）
    所以关键是要实现一个效率高的、可伸缩的对象池；
     - 3.1 slots 快速找到一个可用对象在对象池里的位置
-    - 3.2 或者用 环形缓存区ring 来记录对象位置。
+    - 3.2 或者用 环形缓存区ring 来记录可用对象的位置。
     - 3.3 spinLock 自旋锁来代替sync.Mutex(目前实现的spinLock需要时间的验证和考验,并且小心使用)
     - 3.4 如果内存不够，自动扩展，新建一个对象池pool
 
@@ -76,7 +76,7 @@ cachePool ------> pools            entry0       entry1         entry2
 ```
 过程：
 1. cp.GetValue()：
-    - 1.1 从pool对应的环形区里拿到一个可用节点， 节点保存的是可用的内存块entry的位置信息。
+    - 1.1 从pool对应的环形区里拿到一个可用节点， 节点保存的是可用的内存块entry的位置信息。（为了避免读写环形区的竞争, 优先去per-P 对应的pool里找可用对象)
     - 1.2 根据节点可用找到对应可用的内存块entry，entry.Value 就是代码里可操作的内存。
 2. cp.Store(key, v)：把Key和Value 缓存到 shardmap里，但是shardmap实际保存的值是entryPosition.
 3. cp.Load(key)：通过key 可以找到对象entry的位置信息entryPosition，根据entryPosition便可得到真正对象内存
