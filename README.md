@@ -81,3 +81,7 @@ cachePool ------> pools            entry0       entry1         entry2
 2. cp.Store(key, v)：把Key和Value 缓存到 shardmap里，但是shardmap实际保存的值是entryPosition.
 3. cp.Load(key)：通过key 可以找到对象entry的位置信息entryPosition，根据entryPosition便可得到真正对象内存
 4. 删除缓存cp.DeleteAndFreeValue(key)：把key从shardmap缓存中删除，同时把Value对应内存块entry put回到环形区里，这块内存就可复用了。
+
+
+##### 记录下草稿图
+![image](https://github.com/jursonmo/cachePool/raw/master/cache_pool.jpeg)
