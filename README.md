@@ -46,7 +46,7 @@
     不能作为一个库那样使用， 需要把自己 customKey customValue 分别嵌套在 Key 和 Entry 结构里, 且Key Value 是固定的结构, 
     这导致cachePool不通用，只能作为某种固定对象的缓存、对象池。 
 
-    我们的业务， key value 都是结构体对象， bigcache 存储的是固定value 是[]byte, 我又不想把value 序列化成[]byte ,再用存到bigcache。
+    我们的业务， key value 都是结构体对象， bigcache 存储的key 固定是string, value 固定是[]byte, 我又不想把value 序列化成[]byte ,再用存到bigcache。
 #### 大致构图 
 ```
 cachePool ------> pools            entry0       entry1         entry2
