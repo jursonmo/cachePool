@@ -43,8 +43,10 @@
     1. 自动收缩内存池，即某个pool 使用率不够高，其实是可以在分配内存时不要从这些pool 分配，等待这个pool使用率为0时，可以删除，让gc 回收。
 
 #### 缺点
-    不能作为一个库那样使用， 需要把自己 customKey customValue 分别嵌套在 Key 和 Entry 结构里, 且Key Value 是固定的结构, 这导致cachePool不通用，只能作为某种固定对象的缓存、对象池。 
+    不能作为一个库那样使用， 需要把自己 customKey customValue 分别嵌套在 Key 和 Entry 结构里, 且Key Value 是固定的结构, 
+    这导致cachePool不通用，只能作为某种固定对象的缓存、对象池。 
 
+    我们的业务， key value 都是结构体对象， bigcache 存储的是固定value 是[]byte, 我又不想把value 序列化成[]byte ,再用存到bigcache。
 #### 大致构图 
 ```
 cachePool ------> pools            entry0       entry1         entry2
